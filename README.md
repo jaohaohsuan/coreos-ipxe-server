@@ -1,7 +1,5 @@
 # CoreOS iPXE Server
 
-[![Build Status](https://drone.io/github.com/kelseyhightower/coreos-ipxe-server/status.png)](https://drone.io/github.com/kelseyhightower/coreos-ipxe-server/latest)
-
 The CoreOS iPXE Server attempts to automate as much of the [Booting CoreOS via iPXE](https://coreos.com/docs/running-coreos/bare-metal/booting-with-ipxe/) process as possible, mainly generating iPXE boot scripts and serving CoreOS PXE boot images.
 
 ## Table of Contents
@@ -17,23 +15,19 @@ The CoreOS iPXE Server attempts to automate as much of the [Booting CoreOS via i
 ### Binary Release
 
 ```
-curl -L https://github.com/kelseyhightower/coreos-ipxe-server/releases/download/v0.3.0/coreos-ipxe-server-0.3.0-darwin-amd64 -o coreos-ipxe-server
+curl -L https://github.com/jaohaohsuan/coreos-ipxe-server/releases/download/v1.0/coreos-ipxe-server-darwin -o coreos-ipxe-server
 chmod +x coreos-ipxe-server
 ```
 
-### Source
-
-#### Clone
+#### Build Docker image
 
 ```
-mkdir -p ${GOPATH}/src/github.com/kelseyhightower
-cd ${GOPATH}/src/github.com/kelseyhightower
-git clone git@github.com:kelseyhightower/coreos-ipxe-server.git
+./build.sh
+docker images | grep coreos-ipxe-server
 ```
 
-#### Build
+#### Run
 
 ```
-cd ${GOPATH}/src/github.com/kelseyhightower/coreos-ipxe-server
-go build .
+TAG=`git rev-parse --short HEAD`; docker run -d -p 4777:4777 coreos-ipxe-server:$TAG
 ```
