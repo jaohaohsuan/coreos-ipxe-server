@@ -17,8 +17,8 @@ chain http://192.168.60.100:4777/?profile=${net0/mac:hexhyp}
 ## build & run
 
 ```
-docker build -t ipxe:debian .
-docker run -it --rm -v `pwd`/scripts:/scripts ipxe:debian coreos-macd.ipxe
+docker build -t ipxe:ubuntu .
+docker run -it --rm -v `pwd`/scripts:/scripts ipxe:ubuntu coreos-macd.ipxe
 ls -l scripts/iso/*.iso
 ```
 
