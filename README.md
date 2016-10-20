@@ -57,4 +57,5 @@ opt
 
 ```
 TAG=`git rev-parse --short HEAD`; docker run -v `pwd`/opt:/opt/coreos-ipxe-server -d -p 4777:4777 coreos-ipxe-server:$TAG
+curl http://127.0.0.1:4777?profile=08-00-27-95-1d-f8
 ```
