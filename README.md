@@ -26,9 +26,34 @@ chmod +x coreos-ipxe-server
 ./build.sh
 docker images | grep coreos-ipxe-server
 ```
+#### setup DATA_DIR
+You should check your VM eth card mac address before runing setup.
+I use the [mac address](ipxe/scripts/coreos-macd.ipxe#L5) as the profile name.
+```
+./setup
+tree opt
+```
+You should see like this
+```
+opt
+├── configs
+│   └── plain.yml
+├── images
+│   └── amd64-usr
+│       ├── 1122.0.0
+│       │   ├── coreos_production_pxe_image.cpio.gz
+│       │   └── coreos_production_pxe.vmlinuz
+│       └── 1192.1.0
+│           ├── coreos_production_pxe_image.cpio.gz
+│           └── coreos_production_pxe.vmlinuz
+├── profiles
+│   └── 08-00-27-95-1d-f8.json
+└── sshkeys
+    └── coreos.pub
+```
 
 #### Run
 
 ```
-TAG=`git rev-parse --short HEAD`; docker run -d -p 4777:4777 coreos-ipxe-server:$TAG
+TAG=`git rev-parse --short HEAD`; docker run -v `pwd`/opt:/opt/coreos-ipxe-server -d -p 4777:4777 coreos-ipxe-server:$TAG
 ```
