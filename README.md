@@ -4,6 +4,7 @@ The CoreOS iPXE Server attempts to automate as much of the [Booting CoreOS via i
 
 ## Table of Contents
 
+- [Make ipxe.iso](ipxe/README.md)
 - [Installation](#installation)
 - [Getting Started](docs/getting_started.md)
 - [API](docs/api.md)
@@ -12,7 +13,7 @@ The CoreOS iPXE Server attempts to automate as much of the [Booting CoreOS via i
 
 ## Installation
 
-### Binary Release
+#### Binary Release
 
 ```
 curl -L https://github.com/jaohaohsuan/coreos-ipxe-server/releases/download/v1.0/coreos-ipxe-server-darwin -o coreos-ipxe-server
