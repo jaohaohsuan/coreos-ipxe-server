@@ -19,9 +19,9 @@ chain http://192.168.60.100:4777/?profile=${net0/mac:hexhyp}
 ```
 docker build -t ipxe:debian .
 docker run -it --rm -v `pwd`/scripts:/scripts ipxe:debian coreos-macd.ipxe
-ls -l scripts/*.iso
+ls -l scripts/iso/*.iso
 ```
 
-You should see the `ipxe.iso`
+You should see the `ipxe.iso` that can be mount on your vm.
 
 [More](http://ipxe.org/download)
