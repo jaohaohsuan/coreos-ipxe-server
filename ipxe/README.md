@@ -1,9 +1,9 @@
-# how to make ipxe.iso
+# How to make ipxe.iso
 
 ## write scripts
 
 [Here](http://ipxe.org/scripting) is the documents.
-Change the [coreos-ipxe-server](scripts/coreos-macd.ipex) address.
+Change the [coreos-ipxe-server](scripts/coreos-macd.ipxe) address.
 
 ```
 #!ipxe
