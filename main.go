@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	for _, s := range []string{"/images/", "/configs/", "/profiles/"} {
+	for _, s := range []string{"/images/", "/profiles/"} {
 		// Register static file servers.
 		http.Handle(s, http.StripPrefix(s,
 			http.FileServer(http.Dir(filepath.Join(config.DataDir, s)))))
@@ -23,6 +23,8 @@ func main() {
 	http.HandleFunc("/keys", sshKeyServer)
 	// Register the iPXE boot script server.
 	http.HandleFunc("/", ipxeBootScriptServer)
+
+	http.HandleFunc("/configs/", cloudConfigServer)
 	// Start the iPXE Boot Server.
 	fmt.Println("Starting CoreOS iPXE Server...")
 	fmt.Printf("Listening on %s\n", config.ListenAddr)

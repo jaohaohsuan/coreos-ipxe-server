@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 	"net/http"
+	"net"
 	"path/filepath"
 	"text/template"
 
@@ -44,6 +46,7 @@ func ipxeBootScriptServer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
 
 	if options.CloudConfig != "" {
 		options.SetCloudConfigUrl(fmt.Sprintf("http://%s/configs/%s.yml", baseUrl, options.CloudConfig))
@@ -116,4 +119,25 @@ func kernalOptionsFromFile(filename string, options *kernel.Options) error {
 		return err
 	}
 	return nil
+}
+
+func cloudConfigServer(w http.ResponseWriter, r *http.Request) {
+	uriSegments := strings.Split(r.URL.Path, "/")
+	cloudConfigPath := filepath.Join(config.DataDir, fmt.Sprintf("configs/%s", uriSegments[len(uriSegments)-1]))
+	rd, err := ioutil.ReadFile(cloudConfigPath)
+	if err != nil {
+		log.Printf("Error reading ssh publickey from %s: %s", cloudConfigPath, err)
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	t, _ := template.New("cloud-config").Parse(string(rd))
+
+	ipv4, _, _ := net.SplitHostPort(r.RemoteAddr)
+	
+	data := map[string]string{
+		"private_ipv4": ipv4,
+	}
+
+	_ = t.Execute(w, data)
+	return
 }
