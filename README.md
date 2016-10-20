@@ -31,7 +31,7 @@ You should check your VM `eth card mac` address before running setup.
 
 I use the [mac address](ipxe/scripts/coreos-macd.ipxe#L5) as the profile name.
 ```
-./setup
+./setup.sh
 tree opt
 ```
 You should see like this
