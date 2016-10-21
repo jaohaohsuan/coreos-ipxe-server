@@ -26,6 +26,7 @@ You should see the `ipxe.iso` that can be mount on your vm.
 
 [More](http://ipxe.org/download)
 
-## caveate
-change virtualbox net card otherwise you might boot fail with dhcp.
-![net settings](https://www.thefanclub.co.za/sites/default/files/images/Ubuntu-ThinClient32bit-Settings_017b.png)
+## caveat
+change virtualbox net card adaptor type otherwise you might boot fail with dhcp.
+
+![net settings](http://meinit.nl/image/view/364/_original)
