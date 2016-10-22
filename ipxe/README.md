@@ -22,7 +22,7 @@ docker run -it --rm -v `pwd`/scripts:/scripts ipxe:ubuntu coreos-macd.ipxe
 ls -l scripts/iso/*.iso
 ```
 
-You should see the `ipxe.iso` that can be mount on your vm.
+You should see the `coreos-macd.iso` that can be mount on your vm.
 
 [More](http://ipxe.org/download)
 
