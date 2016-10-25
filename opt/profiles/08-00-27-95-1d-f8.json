@@ -1,0 +1,9 @@
+{
+    "cloud_config": "master",
+    "rootfstype": "btrfs",
+    "root": "LABEL=ROOT",
+    "console": ["tty0", "tty1"],
+    "coreos_autologin": "tty1",
+    "sshkey": "coreos",
+    "version": "1192.2.0"
+}
