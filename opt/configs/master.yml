@@ -1,0 +1,523 @@
+#cloud-config
+---
+
+hostname: "master0"
+
+manage_etc_hosts: "localhost"
+
+ssh_authorized_keys:
+  - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCmUIsevaUMci2lwlj4TYbnH/jS28VBmeJT5KxpT4ku9AZFVnNEfX1C0ZdNF7wW1V1k+Cj3Vzc4KZeBja5imsY/ynmkxsDmrhO5Fga6AtWqottz9HbQNvesjfLfx5/QoGaRycH2r5BZhbCTuRGpiKXKvAh9EmyFFdxb2di+6J4QbwGruF3zWTTijcq70Ip+Dsdfottq2hkNIFIzdgxFm0eXVMOnFEek5AEiCYKYF9VQHjT0NGFqaT4LQPXE3q3Ibox8FgG2T72DlK3YZaxLEKsy2QMpgEFu877cj/oFwLi8V3megOfEjKItuI7UrCml2jmXEBwc9ufEJvy9rfGH4x8wyji90omPAUqMJKfSCJ5H7v0PfwQnM7xxw50kTA741qC5GACZ+PAKsrjC0K6VZ5tAQGtkEvqa5FFUX8w/Q5Yg+RzNdY9o55SOuKf8K2FyUR4qJy/PNATPUnqvW0mocluW+PXBFdwnleHl6pDUObrYsXkQKJ1sHw74tWJHPsgpL7ffZjpRt8KBRKKMaBp2P01+xXhk1Ar86blgyXzMlrw+ia+VlnGkRNeYfV9l3NHYh+rEic6A8T/6XqAgbjtrQyCKjRMwATDUk4rFctpVQP7zURHzPo9Y+/z+RQzHQKDBqcj3BjbQZAwuP+9viqZ+vzXb724UIC1X6eBan7xlNJMDBw== jaohaohsuan@gmail.com"
+
+write_files:
+  - path: /etc/kubernetes/manifests/etcd.json
+    permissions: "0644"
+    content: |
+      {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "etcd",
+          "namespace": "kube-system",
+          "creationTimestamp": null,
+          "labels": {
+            "component": "etcd",
+            "tier": "control-plane"
+          }
+        },
+        "spec": {
+          "volumes": [
+            {
+              "name": "certs",
+              "hostPath": {
+                "path": "/etc/ssl/certs"
+              }
+            },
+            {
+              "name": "etcd",
+              "hostPath": {
+                "path": "/var/lib/etcd"
+              }
+            },
+            {
+              "name": "pki",
+              "hostPath": {
+                "path": "/etc/kubernetes"
+              }
+            }
+          ],
+          "containers": [
+            {
+              "name": "etcd",
+              "image": "gcr.io/google_containers/etcd-amd64:2.2.5",
+              "command": [
+                "etcd",
+                "--listen-client-urls=http://127.0.0.1:2379",
+                "--advertise-client-urls=http://127.0.0.1:2379",
+                "--data-dir=/var/etcd/data"
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "200m"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "name": "certs",
+                  "mountPath": "/etc/ssl/certs"
+                },
+                {
+                  "name": "etcd",
+                  "mountPath": "/var/etcd"
+                },
+                {
+                  "name": "pki",
+                  "readOnly": true,
+                  "mountPath": "/etc/kubernetes/"
+                }
+              ],
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/health",
+                  "port": 2379,
+                  "host": "127.0.0.1"
+                },
+                "initialDelaySeconds": 15,
+                "timeoutSeconds": 15
+              },
+              "securityContext": {
+                "seLinuxOptions": {
+                  "type": "unconfined_t"
+                }
+              }
+            }
+          ],
+          "hostNetwork": true
+        },
+        "status": {}
+      }
+
+  - path: /etc/kubernetes/manifests/kube-apiserver.json
+    permissions: "0644"
+    content: |
+      {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "kube-apiserver",
+          "namespace": "kube-system",
+          "creationTimestamp": null,
+          "labels": {
+            "component": "kube-apiserver",
+            "tier": "control-plane"
+          }
+        },
+        "spec": {
+          "volumes": [
+            {
+              "name": "certs",
+              "hostPath": {
+                "path": "/etc/ssl/certs"
+              }
+            },
+            {
+              "name": "pki",
+              "hostPath": {
+                "path": "/etc/kubernetes"
+              }
+            }
+          ],
+          "containers": [
+            {
+              "name": "kube-apiserver",
+              "image": "gcr.io/google_containers/hyperkube:v1.4.4",
+              "command": [
+                "/apiserver",
+                "--v=4",
+                "--insecure-bind-address=127.0.0.1",
+                "--etcd-servers=http://127.0.0.1:2379",
+                "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+                "--service-cluster-ip-range=100.64.0.0/12",
+                "--service-account-key-file=/etc/kubernetes/pki/apiserver.key",
+                "--client-ca-file=/etc/kubernetes/pki/ca.crt",
+                "--tls-cert-file=/etc/kubernetes/pki/apiserver.crt",
+                "--tls-private-key-file=/etc/kubernetes/pki/apiserver.key",
+                "--token-auth-file=/etc/kubernetes/pki/tokens.csv",
+                "--secure-port=443",
+                "--allow-privileged",
+                "--etcd-servers=http://127.0.0.1:2379"
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "250m"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "name": "certs",
+                  "mountPath": "/etc/ssl/certs"
+                },
+                {
+                  "name": "pki",
+                  "readOnly": true,
+                  "mountPath": "/etc/kubernetes/"
+                }
+              ],
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8080,
+                  "host": "127.0.0.1"
+                },
+                "initialDelaySeconds": 15,
+                "timeoutSeconds": 15
+              }
+            }
+          ],
+          "hostNetwork": true
+        },
+        "status": {}
+      }
+
+  - path: /etc/kubernetes/manifests/kube-controller-manager.json
+    permissions: "0644"
+    content: |
+      {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "kube-controller-manager",
+          "namespace": "kube-system",
+          "creationTimestamp": null,
+          "labels": {
+            "component": "kube-controller-manager",
+            "tier": "control-plane"
+          }
+        },
+        "spec": {
+          "volumes": [
+            {
+              "name": "pki",
+              "hostPath": {
+                "path": "/etc/kubernetes"
+              }
+            }
+          ],
+          "containers": [
+            {
+              "name": "kube-controller-manager",
+              "image": "gcr.io/google_containers/hyperkube:v1.4.4",
+              "command": [
+                "/controller-manager",
+                "--v=4",
+                "--address=127.0.0.1",
+                "--leader-elect",
+                "--master=127.0.0.1:8080",
+                "--cluster-name=kubernetes",
+                "--root-ca-file=/etc/kubernetes/pki/ca.crt",
+                "--service-account-private-key-file=/etc/kubernetes/pki/apiserver.key",
+                "--cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt",
+                "--cluster-signing-key-file=/etc/kubernetes/pki/ca.key",
+                "--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap"
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "200m"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "name": "pki",
+                  "readOnly": true,
+                  "mountPath": "/etc/kubernetes/"
+                }
+              ],
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 10252,
+                  "host": "127.0.0.1"
+                },
+                "initialDelaySeconds": 15,
+                "timeoutSeconds": 15
+              }
+            }
+          ],
+          "hostNetwork": true
+        },
+        "status": {}
+      }
+
+  - path: /etc/kubernetes/manifests/kube-scheduler.json
+    permissions: "0644"
+    content: |
+      {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "kube-scheduler",
+          "namespace": "kube-system",
+          "creationTimestamp": null,
+          "labels": {
+            "component": "kube-scheduler",
+            "tier": "control-plane"
+          }
+        },
+        "spec": {
+          "containers": [
+            {
+              "name": "kube-scheduler",
+              "image": "gcr.io/google_containers/hyperkube:v1.4.4",
+              "command": [
+                "/scheduler",
+                "--v=4",
+                "--address=127.0.0.1",
+                "--leader-elect",
+                "--master=127.0.0.1:8080"
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "100m"
+                }
+              },
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 10251,
+                  "host": "127.0.0.1"
+                },
+                "initialDelaySeconds": 15,
+                "timeoutSeconds": 15
+              }
+            }
+          ],
+          "hostNetwork": true
+        },
+        "status": {}
+      }
+
+  - path: /opt/bin/easy-rsa-install.sh
+    owner: root
+    permissions: "0744"
+    content: |
+      #! /usr/bin/bash
+
+      set -e
+
+      if [ -z "${ENP0S3_IPV4}" ]; then
+          echo "ERROR: must set ENP0S3_IPV4"
+          exit 1
+      fi
+
+      PROXY="${PROXY:--x http://192.168.1.108:3128}"
+      EASY_RSA_DIR=/opt/bin/easy-rsa-master
+
+      if [ ! -d $EASY_RSA_DIR ]; then
+        cd /opt/bin
+        curl ${PROXY} -Ls https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz | tar xzv
+      fi
+      export EASYRSA_PKI=${EASYRSA_PKI:-$EASY_RSA_DIR/`hostname`}
+      export EASYRSA=$EASY_RSA_DIR/easyrsa3
+
+      if [ ! -d ${EASYRSA_PKI} ]; then
+        cd ${EASYRSA}
+        ./easyrsa init-pki
+
+        # build ca
+        ./easyrsa --batch --req-cn=cluster.local build-ca nopass
+
+        ./easyrsa --subject-alt-name="IP:${ENP0S3_IPV4},IP:100.64.0.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local,DNS:`hostname`" build-server-full apiserver nopass
+
+        ./easyrsa build-client-full kubelet nopass
+      fi
+      
+      mkdir -p /etc/kubernetes/pki
+      PKI_DIR="$_"
+
+      cd ${EASYRSA_PKI}
+      
+      cp -v -n ca.crt $PKI_DIR/ca.crt
+      cp -v -n private/ca.key $PKI_DIR/ca.key
+
+      cp -v -n issued/apiserver.crt $PKI_DIR/apiserver.crt
+      cp -v -n private/apiserver.key $PKI_DIR/apiserver.key
+
+      cp -v -n issued/kubelet.crt $PKI_DIR/kubelet.crt
+      cp -v -n private/kubelet.key $PKI_DIR/kubelet.key
+
+      toBase64String() {
+        echo `cat $1 | base64 | tr -d '\n'`
+      }
+
+      # generate tokens.csv
+      # token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+      echo "80ea75.aa312981a8656e74,kubeadm-node-csr,a9d24acd-8624-11e6-a746-0251dac04080,system:kubelet-bootstrap" > $PKI_DIR/tokens.csv
+      
+      KUBELET_CONF=/etc/kubernetes/kubelet.conf
+
+      # [kubeconfig](http://kubernetes.io/docs/user-guide/kubeconfig-file/)
+      cat << EOF > $KUBELET_CONF
+      apiVersion: v1
+      kind: Config
+      clusters:
+      - cluster:
+          certificate-authority-data: `toBase64String $PKI_DIR/ca.crt`
+          server: https://${ENP0S3_IPV4}:443
+        name: kubernetes
+      contexts:
+      - context:
+          cluster: kubernetes
+          user: kubelet
+        name: kubelet@kubernetes
+      current-context: kubelet@kubernetes
+      users:
+      - name: kubelet  
+        user:
+          client-certificate: $PKI_DIR/kubelet.crt
+          client-key: $PKI_DIR/kubelet.key
+      - name: kubelet-t
+        user:
+          token: 32ab6eb6305c8f8d
+      EOF
+
+      chmod 0600 $KUBELET_CONF
+
+  - path: /opt/bin/kubelet-wrapper
+    owner: root
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      # Wrapper for launching kubelet via rkt-fly stage1.
+      #
+      # Make sure to set KUBELET_VERSION to an image tag published here:
+      # https://quay.io/repository/coreos/hyperkube?tab=tags Alternatively,
+      # override $KUBELET_ACI to a custom location.
+
+      set -e
+
+      if [ -z "${KUBELET_VERSION}" ]; then
+          echo "ERROR: must set KUBELET_VERSION"
+          exit 1
+      fi
+
+      KUBELET_ACI="${KUBELET_ACI:-gcr.io/google_containers/hyperkube}"
+
+      mkdir --parents /etc/kubernetes
+      mkdir --parents /var/lib/docker
+      mkdir --parents /var/lib/kubelet
+      mkdir --parents /run/kubelet
+
+      exec /usr/bin/docker run \
+        --rm \
+        -v /etc/kubernetes:/etc/kubernetes \
+        -v /usr/share/ca-certificates:/etc/ssl/certs \
+        -v /var/lib/docker:/var/lib/docker \
+        -v /var/lib/kubelet:/var/lib/kubelet \
+        -v /run:/run \
+        --privileged=true \
+        --net=host \
+        --pid=host \
+        --security-opt seccomp=unconfined \
+        ${KUBELET_ACI}:${KUBELET_VERSION} /kubelet "$@"
+coreos:
+  units:
+    - name: settimezone.service
+      command: start
+      content: |
+        [Unit]
+        Description=Set the time zone
+
+        [Service]
+        ExecStart=/usr/bin/timedatectl set-timezone Asia/Taipei
+        RemainAfterExit=yes
+        Type=oneshot
+
+    - name: setup-kubernetes-pki.service
+      command: start
+      content: |
+        [Unit]
+        Requires=setup-network-environment.service
+        After=setup-network-environment.service
+
+        [Service]
+        EnvironmentFile=/etc/network-environment
+        ExecStart=/opt/bin/easy-rsa-install.sh
+        RemainAfterExit=yes
+        Type=oneshot
+    - name: setup-network-environment.service
+      command: start
+      content: |
+        [Unit]
+        Description=Setup Network Environment
+        Documentation=https://github.com/kelseyhightower/setup-network-environment
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+        Environment="PROXY=-e use_proxy=yes -e http_proxy=192.168.1.108:3128"
+        ExecStartPre=-/usr/bin/wget $PROXY -N -P /opt/bin https://github.com/kelseyhightower/setup-network-environment/releases/download/1.0.1/setup-network-environment
+
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment
+        ExecStart=/opt/bin/setup-network-environment
+        RemainAfterExit=yes
+        Type=oneshot
+    - name: docker.service
+      drop-ins:
+        - name: 20-http-proxy.conf
+          content: |
+            [Service]
+            Environment="HTTP_PROXY=http://192.168.1.108:3128"
+            Environment="HTTPS_PROXY=http://192.168.1.108:3128"
+          command: restart
+        - name: 10-host-tcp.conf
+          content: |
+            [Service]
+            Environment="DOCKER_OPTS=--host=tcp://0.0.0.0:2375"
+
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Requires=setup-network-environment.service
+        After=setup-network-environment.service
+        [Service]
+        #Slice=machine.slice
+        ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests /opt/cni/bin /etc/cni/net.d
+        EnvironmentFile=/etc/network-environment
+        Environment=KUBELET_VERSION=v1.4.4
+        Environment=KUBELET_ACI=gcr.io/google_containers/hyperkube
+        ExecStart=/opt/bin/kubelet-wrapper --pod-manifest-path=/etc/kubernetes/manifests \
+                                           --allow-privileged=true \
+                                           --cluster-dns=100.64.0.10 \
+                                           --cluster-domain=cluster.local \
+                                           --kubeconfig=/etc/kubernetes/kubelet.conf \
+                                           --require-kubeconfig=true \
+                                           --docker-endpoint=tcp://127.0.0.1:2375 \
+                                           --network-plugin=cni \
+                                           --cni-conf-dir=/etc/cni/net.d \
+                                           --cni-bin-dir=/opt/cni/bin
+        KillMode=mixed
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: rkt-metadata.socket
+      command: start
+
+    - name: rkt-metadata.service
+      command: start
+
+    - name: rkt-api.service
+      command: start
+      content: |
+        [Unit]
+        Description=rkt api service
+        Documentation=http://github.com/coreos/rkt
+        After=network.target
+
+        [Service]
+        ExecStart=/usr/bin/rkt api-service --listen=0.0.0.0:15441
+
+        [Install]
+        WantedBy=multi-user.target
