@@ -295,6 +295,40 @@ write_files:
         "status": {}
       }
 
+  - path: /opt/bin/install-kubernetes-cni.sh
+    owner: root
+    permissions: "0744"
+    content: |
+      #! /usr/bin/bash
+
+      set -x -e
+      if [ ! "$(ls -A /opt/cni/bin)" ]; then
+        cd /opt/cni
+        echo "Downloading kubernetes-cni ..."
+        /usr/bin/curl ${PROXY} -Ls https://storage.googleapis.com/kubernetes-release/network-plugins/cni-amd64-${CNI_RELEASE}.tar.gz | tar xzv
+        echo "Done"
+      fi
+
+      # check if dir '/opt/cni/bin' is empty.
+      echo "/opt/cni/bin contains $(ls -A -l /opt/cni/bin | wc -l) files"
+
+  - path: /opt/bin/install-kubectl.sh
+    owner: root
+    permissions: "0744"
+    content: |
+      #! /usr/bin/bash
+
+      set -x -e
+      if [ ! -f /opt/bin/kubectl ]; then
+        echo "Copy kubectl from docker ..."
+        /usr/bin/docker run --rm -v /opt/bin:/tmp/bin gcr.io/google_containers/hyperkube:v1.4.4 /bin/sh -c "cp /hyperkube /tmp/bin/"
+        ln -s /opt/bin/hyperkube /opt/bin/kubectl
+        echo "Done"
+      fi
+
+      # install kubectl completion gloablly
+      echo 'source <(/opt/bin/kubectl completion bash)' > /etc/profile.d/kubectl-completion.sh
+
   - path: /opt/bin/easy-rsa-install.sh
     owner: root
     permissions: "0744"
@@ -303,8 +337,8 @@ write_files:
 
       set -e
 
-      if [ -z "${ENP0S3_IPV4}" ]; then
-          echo "ERROR: must set ENP0S3_IPV4"
+      if [ -z "${DEFAULT_IPV4}" ]; then
+          echo "ERROR: must set DEFAULT_IPV4"
           exit 1
       fi
 
@@ -325,7 +359,7 @@ write_files:
         # build ca
         ./easyrsa --batch --req-cn=cluster.local build-ca nopass
 
-        ./easyrsa --subject-alt-name="IP:${ENP0S3_IPV4},IP:100.64.0.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local,DNS:`hostname`" build-server-full apiserver nopass
+        ./easyrsa --subject-alt-name="IP:${DEFAULT_IPV4},IP:100.64.0.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local,DNS:`hostname`" build-server-full apiserver nopass
 
         ./easyrsa build-client-full kubelet nopass
       fi
@@ -361,7 +395,7 @@ write_files:
       clusters:
       - cluster:
           certificate-authority-data: `toBase64String $PKI_DIR/ca.crt`
-          server: https://${ENP0S3_IPV4}:443
+          server: https://${DEFAULT_IPV4}:443
         name: kubernetes
       contexts:
       - context:
@@ -386,12 +420,6 @@ write_files:
     permissions: "0755"
     content: |
       #!/bin/bash
-      # Wrapper for launching kubelet via rkt-fly stage1.
-      #
-      # Make sure to set KUBELET_VERSION to an image tag published here:
-      # https://quay.io/repository/coreos/hyperkube?tab=tags Alternatively,
-      # override $KUBELET_ACI to a custom location.
-
       set -e
 
       if [ -z "${KUBELET_VERSION}" ]; then
@@ -399,7 +427,7 @@ write_files:
           exit 1
       fi
 
-      KUBELET_ACI="${KUBELET_ACI:-gcr.io/google_containers/hyperkube}"
+      KUBELET_IMG="${KUBELET_IMG:-gcr.io/google_containers/hyperkube}"
 
       mkdir --parents /etc/kubernetes
       mkdir --parents /var/lib/docker
@@ -412,12 +440,14 @@ write_files:
         -v /usr/share/ca-certificates:/etc/ssl/certs \
         -v /var/lib/docker:/var/lib/docker \
         -v /var/lib/kubelet:/var/lib/kubelet \
+        -v /etc/cni/net.d:/etc/cni/net.d \
+        -v /opt/cni/bin:/opt/cni/bin \
         -v /run:/run \
         --privileged=true \
         --net=host \
         --pid=host \
         --security-opt seccomp=unconfined \
-        ${KUBELET_ACI}:${KUBELET_VERSION} /kubelet "$@"
+        ${KUBELET_IMG}:${KUBELET_VERSION} /kubelet "$@"
 coreos:
   units:
     - name: settimezone.service
@@ -443,6 +473,43 @@ coreos:
         ExecStart=/opt/bin/easy-rsa-install.sh
         RemainAfterExit=yes
         Type=oneshot
+
+    - name: install-kubernetes-cni.service
+      command: start
+      content: |
+        [Unit]
+        Description=Install Kubernetes CNI
+        Documentation=https://github.com/kubernetes/release/blob/master/debian/xenial/kubernetes-cni/debian/rules
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        Environment="CNI_RELEASE=07a8a28637e97b22eb8dfe710eeae1344f69d16e"
+        Environment="PROXY=-x http://192.168.1.108:3128"
+
+        ExecStartPre=-/usr/bin/mkdir -p /opt/cni/bin /etc/cni/net.d
+        ExecStart=/opt/bin/install-kubernetes-cni.sh
+
+        RemainAfterExit=yes
+        Type=oneshot
+
+    - name: install-kubectl.service
+      command: start
+      content: |
+        [Unit]
+        Description=Install kubectl
+        Documentation=http://kubernetes.io/docs/user-guide/kubectl-overview/
+        Requires=network-online.target docker.service
+        After=network-online.target docker.service
+
+        [Service]
+        Environment="PROXY=-x http://192.168.1.108:3128"
+        ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+        ExecStart=/opt/bin/install-kubectl.sh
+
+        RemainAfterExit=yes
+        Type=oneshot
+
     - name: setup-network-environment.service
       command: start
       content: |
@@ -468,24 +535,25 @@ coreos:
             [Service]
             Environment="HTTP_PROXY=http://192.168.1.108:3128"
             Environment="HTTPS_PROXY=http://192.168.1.108:3128"
-          command: restart
         - name: 10-host-tcp.conf
           content: |
             [Service]
             Environment="DOCKER_OPTS=--host=tcp://0.0.0.0:2375"
+      command: restart
 
+    - name: 
     - name: kubelet.service
       command: start
       content: |
         [Unit]
-        Requires=setup-network-environment.service
-        After=setup-network-environment.service
+        Requires=setup-kubernetes-pki.service install-kubernetes-cni.service
+        After=setup-kubernetes-pki.service install-kubernetes-cni.service
         [Service]
         #Slice=machine.slice
         ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests /opt/cni/bin /etc/cni/net.d
         EnvironmentFile=/etc/network-environment
         Environment=KUBELET_VERSION=v1.4.4
-        Environment=KUBELET_ACI=gcr.io/google_containers/hyperkube
+        Environment=KUBELET_IMG=gcr.io/google_containers/hyperkube
         ExecStart=/opt/bin/kubelet-wrapper --pod-manifest-path=/etc/kubernetes/manifests \
                                            --allow-privileged=true \
                                            --cluster-dns=100.64.0.10 \
